@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Local product database with manual mappings
 - Shopping list auto-add functionality
 - Two sensor entities: statistics and unknown products
+- **Binary diagnostic sensor**: API health monitoring (error tracking, rate limit detection)
 - Rate limiting (12 req/min) to comply with OpenFoodFacts API limits
 - Configurable contact email for User-Agent compliance
 - Multi-language product name support (sv, en, de, fr, es)

@@ -143,6 +143,25 @@ data:
     - `total_unknown`: Total count
     - `last_missing_ean`: Last unknown EAN
 
+### Binary Sensor (Diagnostic)
+
+- **binary_sensor.ean_reader_api_problem**
+  - State: ON when API issues detected, OFF when healthy
+  - Device Class: Problem
+  - Category: Diagnostic
+  - Attributes:
+    - `error_count`: Total API errors encountered
+    - `rate_limited_count`: Number of times rate limited
+    - `last_error`: Description of last error
+    - `last_error_time`: When the last error occurred
+    - `api_available`: Boolean indicating API health
+
+  **Use for:**
+  - Monitoring OpenFoodFacts API connectivity
+  - Triggering alerts when rate limits are hit
+  - Troubleshooting integration issues
+  - Automations based on API health
+
 ## Services
 
 ### ean_reader.add_mapping
@@ -259,6 +278,7 @@ Listen to these events in automations:
 
 ### Example Automation
 
+**Notify on Unknown Product:**
 ```yaml
 automation:
   - alias: "Notify on Unknown Product"
@@ -270,6 +290,23 @@ automation:
         data:
           title: "Unknown Product"
           message: "EAN {{ trigger.event.data.ean }} needs a name"
+```
+
+**Alert on API Problems:**
+```yaml
+automation:
+  - alias: "Alert on OpenFoodFacts API Issues"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.ean_reader_api_problem
+        to: "on"
+    action:
+      - service: notify.persistent_notification
+        data:
+          title: "EAN Reader API Problem"
+          message: >
+            OpenFoodFacts API issue detected: 
+            {{ state_attr('binary_sensor.ean_reader_api_problem', 'last_error') }}
 ```
 
 ## Rate Limiting

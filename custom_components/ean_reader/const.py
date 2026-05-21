@@ -49,8 +49,15 @@ ATTR_LAST_SCAN_TIME: Final = "last_scan_time"
 ATTR_OPENFOODFACTS_HITS: Final = "openfoodfacts_hits"
 ATTR_LOCAL_HITS: Final = "local_hits"
 
+# Diagnostic attributes
+ATTR_LAST_ERROR: Final = "last_error"
+ATTR_LAST_ERROR_TIME: Final = "last_error_time"
+ATTR_ERROR_COUNT: Final = "error_count"
+ATTR_RATE_LIMITED_COUNT: Final = "rate_limited_count"
+ATTR_API_AVAILABLE: Final = "api_available"
+
 # Platforms
-PLATFORMS: Final = ["sensor"]
+PLATFORMS: Final = ["sensor", "binary_sensor"]
 
 
 def build_user_agent(email: str | None = None) -> str:

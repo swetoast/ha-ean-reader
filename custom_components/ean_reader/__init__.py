@@ -341,14 +341,28 @@ async def _resolve_name(
         product = await _lookup_openfoodfacts(hass, ean, lang_priority, show_images)
     except requests.exceptions.HTTPError as err:
         if err.response.status_code == 503:
-            # Rate limited - don't cache as unknown, just return
+            # Rate limited - record and don't cache as unknown
+            from datetime import UTC, datetime
+            hass.data[DOMAIN]["diagnostics"]["last_error"] = "Rate limit exceeded (HTTP 503)"
+            hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
+            hass.data[DOMAIN]["diagnostics"]["rate_limited_count"] += 1
             _LOGGER.warning(
                 "Rate limited by OpenFoodFacts API. Try again later. EAN: %s", ean
             )
             return None, "rate_limited"
+        # Record other HTTP errors
+        from datetime import UTC, datetime
+        hass.data[DOMAIN]["diagnostics"]["last_error"] = f"HTTP {err.response.status_code}: {err}"
+        hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
+        hass.data[DOMAIN]["diagnostics"]["error_count"] += 1
         _LOGGER.error("HTTP error looking up EAN %s: %s", ean, err)
         return None, "error"
     except Exception as err:
+        # Record unexpected errors
+        from datetime import UTC, datetime
+        hass.data[DOMAIN]["diagnostics"]["last_error"] = str(err)
+        hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
+        hass.data[DOMAIN]["diagnostics"]["error_count"] += 1
         _LOGGER.error("Unexpected error looking up EAN %s: %s", ean, err)
         return None, "error"
 
@@ -368,7 +382,6 @@ async def _resolve_name(
         return product["name"], "openfoodfacts"
 
     # Only mark as unknown if we got a definitive "not found" response
-    # Don't mark if we hit rate limits or errors
     unknown = await store.async_mark_unknown(ean)
     hass.bus.async_fire(
         EVENT_MISSING_PRODUCT,
@@ -415,6 +428,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN]["store"] = store
     hass.data[DOMAIN]["tasks"] = set()
     hass.data[DOMAIN]["config"] = entry.options.copy()
+    hass.data[DOMAIN]["diagnostics"] = {
+        "last_error": None,
+        "last_error_time": None,
+        "error_count": 0,
+        "rate_limited_count": 0,
+    }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
