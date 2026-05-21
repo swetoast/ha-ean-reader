@@ -1,0 +1,12 @@
+{
+  "domain": "ean_reader",
+  "name": "EAN Reader",
+  "version": "1.0.0",
+  "documentation": "https://github.com/swetoast/ha-ean-reader",
+  "issue_tracker": "https://github.com/swetoast/ha-ean-reader/issues",
+  "requirements": ["openfoodfacts>=0.2.0"],
+  "codeowners": ["@swetoast"],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "after_dependencies": ["shopping_list"]
+}

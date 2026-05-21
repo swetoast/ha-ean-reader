@@ -1,0 +1,142 @@
+add_mapping:
+  name: Add mapping
+  description: Add or update an EAN to product name mapping in the local database.
+  fields:
+    ean:
+      required: true
+      example: "7318690101234"
+      description: The EAN/UPC barcode number (8-14 digits)
+      selector:
+        text:
+    name:
+      required: true
+      example: "Oatly Oat Milk 1L"
+      description: Product name to display in shopping list
+      selector:
+        text:
+    add_to_shopping_list:
+      required: false
+      default: false
+      description: Automatically add to shopping list after mapping
+      selector:
+        boolean:
+
+add_last_missing_mapping:
+  name: Add last missing mapping
+  description: Map the last unknown scanned EAN to a product name.
+  fields:
+    name:
+      required: true
+      example: "Local Store Brand Milk"
+      description: Product name for the last scanned unknown EAN
+      selector:
+        text:
+    add_to_shopping_list:
+      required: false
+      default: true
+      description: Automatically add to shopping list after mapping
+      selector:
+        boolean:
+
+remove_mapping:
+  name: Remove mapping
+  description: Remove an EAN from the local database.
+  fields:
+    ean:
+      required: true
+      example: "7318690101234"
+      description: The EAN/UPC barcode number to remove
+      selector:
+        text:
+
+lookup_product:
+  name: Lookup product
+  description: Look up an EAN using OpenFoodFacts and cache the product name if found.
+  fields:
+    ean:
+      required: true
+      example: "3017624010701"
+      description: The EAN/UPC barcode number to look up
+      selector:
+        text:
+
+add_scanned_to_shopping_list:
+  name: Add scanned to shopping list
+  description: Resolve an EAN and add it to the shopping list.
+  fields:
+    ean:
+      required: true
+      example: "3017624010701"
+      description: The EAN/UPC barcode number to add
+      selector:
+        text:
+
+list_unknowns:
+  name: List unknown products
+  description: Fire an event with a list of all unknown EANs that need manual mapping.
+
+export_mappings:
+  name: Export mappings
+  description: Export all EAN mappings to a JSON structure.
+
+import_mappings:
+  name: Import mappings
+  description: Import EAN mappings from exported data.
+  fields:
+    data:
+      required: true
+      description: JSON data from a previous export
+      example: '{"version": 3, "mappings": {...}}'
+      selector:
+        object:
+    merge:
+      required: false
+      default: true
+      description: Merge with existing mappings (true) or replace all (false)
+      selector:
+        boolean:
+
+add_price:
+  name: Add price
+  description: Add a price tracking entry for a product.
+  fields:
+    ean:
+      required: true
+      example: "7318690101234"
+      description: The EAN/UPC barcode number
+      selector:
+        text:
+    price:
+      required: true
+      example: 25.90
+      description: The price of the product
+      selector:
+        number:
+          min: 0
+          max: 99999
+          step: 0.01
+          mode: box
+    currency:
+      required: false
+      default: "SEK"
+      example: "SEK"
+      description: Currency code (ISO 4217)
+      selector:
+        text:
+
+set_expiry:
+  name: Set expiry date
+  description: Set or update the expiry date for a product.
+  fields:
+    ean:
+      required: true
+      example: "7318690101234"
+      description: The EAN/UPC barcode number
+      selector:
+        text:
+    expiry_date:
+      required: true
+      example: "2025-12-31"
+      description: Expiry date in YYYY-MM-DD format
+      selector:
+        date:

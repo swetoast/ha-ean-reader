@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up EAN Reader",
+        "description": "Configure EAN Reader for barcode scanning. Your contact email helps OpenFoodFacts identify your integration.",
+        "data": {
+          "contact_email": "Contact email (for OpenFoodFacts API)",
+          "auto_add_to_shopping_list": "Automatically add scanned items to shopping list",
+          "show_notifications": "Show notifications",
+          "show_images": "Show product images",
+          "track_prices": "Enable price tracking",
+          "track_expiry": "Enable expiry date tracking",
+          "enable_webhook": "Enable webhook"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one instance allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "EAN Reader Options",
+        "data": {
+          "contact_email": "Contact email (for OpenFoodFacts API)",
+          "auto_add_to_shopping_list": "Auto-add to shopping list",
+          "show_notifications": "Show notifications",
+          "show_images": "Show product images",
+          "track_prices": "Enable price tracking",
+          "track_expiry": "Enable expiry tracking",
+          "enable_webhook": "Enable webhook",
+          "language_priority": "Language priority (comma-separated)"
+        }
+      }
+    }
+  }
+}

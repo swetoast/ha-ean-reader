@@ -1,0 +1,8 @@
+{
+  "name": "EAN Reader",
+  "country": ["SE", "NO", "DK", "FI", "DE", "FR", "ES", "GB", "US"],
+  "domains": ["sensor", "shopping_list"],
+  "iot_class": "cloud_polling",
+  "homeassistant": "2024.1.0",
+  "render_readme": true
+}

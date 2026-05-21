@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Toast
+Copyright (c) 2025 EAN Reader Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,28 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+THIRD-PARTY DATA AND LICENSES
+
+This software uses data from OpenFoodFacts (https://world.openfoodfacts.org/),
+which is made available under the following licenses:
+
+- OpenFoodFacts Database: Open Database License (ODbL) 1.0
+  https://opendatacommons.org/licenses/odbl/1.0/
+
+- Database Contents: Database Contents License (DbCL) 1.0
+  https://opendatacommons.org/licenses/dbcl/1.0/
+
+- Product Images: Creative Commons Attribution ShareAlike (CC BY-SA) 3.0
+  https://creativecommons.org/licenses/by-sa/3.0/deed.en
+
+When using data from OpenFoodFacts through this integration, you must comply
+with the above licenses and provide proper attribution to OpenFoodFacts.
+
+For full terms, see: https://world.openfoodfacts.org/terms-of-use
+
+This software uses the openfoodfacts-python library, which is licensed under
+the MIT License:
+https://github.com/openfoodfacts/openfoodfacts-python/blob/develop/LICENSE
