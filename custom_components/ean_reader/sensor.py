@@ -30,6 +30,7 @@ async def async_setup_entry(
     async_add_entities([
         EANReaderStatsSensor(db, config_entry),
         EANReaderUnknownsSensor(db, config_entry),
+        EANReaderShoppingListSensor(db, config_entry),
     ])
 
 
@@ -130,6 +131,80 @@ class EANReaderUnknownsSensor(SensorEntity):
             "unknowns": unknowns_list[:20],
             "total_unknown": len(self._db.unknowns),
             "last_missing_ean": self._db.last_missing_ean,
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks."""
+
+        @callback
+        def _handle_event(event):
+            """Handle stat update events."""
+            self.async_schedule_update_ha_state()
+
+        self.async_on_remove(
+            self.hass.bus.async_listen(EVENT_STATS_UPDATED, _handle_event)
+        )
+
+
+class EANReaderShoppingListSensor(SensorEntity):
+    """Sensor showing shopping list with all products."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Shopping List"
+    _attr_icon = "mdi:cart"
+
+    def __init__(self, db, config_entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        self._db = db
+        self._attr_unique_id = f"{config_entry.entry_id}_shopping_list"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, config_entry.entry_id)},
+            "name": "EAN Reader",
+            "manufacturer": "Custom",
+            "model": "EAN Reader",
+        }
+
+    @property
+    def native_value(self) -> int:
+        """Return the count of items in shopping list."""
+        return sum(1 for p in self._db.products.values() if p.in_shopping_list)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return the shopping list products as attributes."""
+        shopping_products = []
+        
+        for product in self._db.products.values():
+            if product.in_shopping_list:
+                shopping_products.append({
+                    "ean": product.ean,
+                    "product_name": product.product_name,
+                    "brands": product.brands,
+                    "quantity": product.quantity,
+                    "shopping_list_quantity": product.shopping_list_quantity,
+                    "image_url": product.image_url,
+                    "nutrition_grades": product.nutrition_grades,
+                    "eco_score_grade": product.eco_score_grade,
+                    "nova_group": product.nova_group,
+                    "ingredients_analysis_vegan": product.ingredients_analysis_vegan,
+                    "ingredients_analysis_vegetarian": product.ingredients_analysis_vegetarian,
+                    "energy_kcal": product.energy_kcal,
+                    "fat": product.fat,
+                    "carbohydrates": product.carbohydrates,
+                    "proteins": product.proteins,
+                    "serving_size": product.serving_size,
+                    "calcium": product.calcium,
+                    "iron": product.iron,
+                    "vitamin_c": product.vitamin_c,
+                    "packaging": product.packaging,
+                    "carbon_footprint": product.carbon_footprint,
+                    "alcohol": product.alcohol,
+                    "caffeine": product.caffeine,
+                })
+        
+        return {
+            "products": shopping_products,
+            "count": len(shopping_products),
         }
 
     async def async_added_to_hass(self) -> None:
