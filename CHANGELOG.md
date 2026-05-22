@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Shopping list sensor properly updates when items added/removed
+- Card reactivity fixed with proper LitElement state updates
 - Binary sensor (API Problem) now properly updates with event listeners
 
 ## [1.0.0] - 2025-01-XX

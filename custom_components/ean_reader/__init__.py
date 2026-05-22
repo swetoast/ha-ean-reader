@@ -287,17 +287,20 @@ async def _resolve_name(
             hass.data[DOMAIN]["diagnostics"]["last_error"] = "Rate limit exceeded (HTTP 503)"
             hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
             hass.data[DOMAIN]["diagnostics"]["rate_limited_count"] += 1
+            hass.bus.async_fire(EVENT_STATS_UPDATED, {})
             _LOGGER.warning("Rate limited by OpenFoodFacts API. EAN: %s", ean)
             return None, "rate_limited"
         hass.data[DOMAIN]["diagnostics"]["last_error"] = f"HTTP {err.response.status_code}: {err}"
         hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
         hass.data[DOMAIN]["diagnostics"]["error_count"] += 1
+        hass.bus.async_fire(EVENT_STATS_UPDATED, {})
         _LOGGER.error("HTTP error looking up EAN %s: %s", ean, err)
         return None, "error"
     except Exception as err:
         hass.data[DOMAIN]["diagnostics"]["last_error"] = str(err)
         hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
         hass.data[DOMAIN]["diagnostics"]["error_count"] += 1
+        hass.bus.async_fire(EVENT_STATS_UPDATED, {})
         _LOGGER.error("Unexpected error looking up EAN %s: %s", ean, err)
         return None, "error"
 
