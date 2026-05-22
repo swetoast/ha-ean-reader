@@ -140,3 +140,42 @@ set_expiry:
       description: Expiry date in YYYY-MM-DD format
       selector:
         date:
+
+remove_from_shopping_list:
+  name: Remove from Shopping List
+  description: Remove product from shopping list
+  fields:
+    ean:
+      name: EAN
+      description: Product EAN code
+      required: true
+      example: "7318690101234"
+      selector:
+        text:
+
+update_shopping_list_quantity:
+  name: Update Shopping List Quantity
+  description: Update quantity for item in shopping list
+  fields:
+    ean:
+      name: EAN
+      description: Product EAN code
+      required: true
+      example: "7318690101234"
+      selector:
+        text:
+    quantity:
+      name: Quantity
+      description: Quantity (e.g., "2", "500g", "3x")
+      required: true
+      example: "2"
+      selector:
+        text:
+
+clear_shopping_list:
+  name: Clear Shopping List
+  description: Clear all items from shopping list
+
+get_shopping_list:
+  name: Get Shopping List
+  description: Get all items in shopping list (fires event with list)

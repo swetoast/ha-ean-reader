@@ -57,7 +57,7 @@ This integration uses the [OpenFoodFacts](https://world.openfoodfacts.org/) data
 
 ### Manual
 
-1. Download the zip under code
+1. Download the [latest release](https://github.com/swetoast/ha-ean-reader/releases)
 2. Copy the `custom_components/ean_reader` folder to your `config/custom_components/` directory
 3. Restart Home Assistant
 4. **Fill out** the [OpenFoodFacts API usage form](https://docs.google.com/forms/d/e/1FAIpQLSdIE3D8qvjC_zRJw1W8OmuHhsWJ_NSckiiniAHlfaVwUZCziQ/viewform)

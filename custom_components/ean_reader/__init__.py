@@ -13,7 +13,6 @@ import requests
 from homeassistant.components import webhook
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-import voluptuous as vol
 
 from .const import (
     CONF_AUTO_ADD_TO_SHOPPING_LIST,
@@ -43,7 +42,7 @@ from .const import (
     PLATFORMS,
     build_user_agent,
 )
-from .storage import MappingStore
+from .product_database import ProductData, ProductDatabase
 
 _LOGGER = logging.getLogger(__name__)
 EAN_RE = re.compile(r"^\d{8,14}$")
@@ -51,22 +50,10 @@ CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 
 class RateLimiter:
-    """Rate limiter to comply with OpenFoodFacts API limits.
-    
-    OpenFoodFacts limits:
-    - 15 requests per minute per IP for product queries
-    - 10 requests per minute per IP for search queries
-    
-    We use a conservative limit of 12 requests per minute to stay safe.
-    """
+    """Rate limiter for OpenFoodFacts API compliance."""
 
     def __init__(self, max_requests: int = 12, window_seconds: int = 60):
-        """Initialize rate limiter.
-        
-        Args:
-            max_requests: Maximum requests allowed in the time window
-            window_seconds: Time window in seconds
-        """
+        """Initialize rate limiter."""
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self.requests: deque[float] = deque()
@@ -77,11 +64,9 @@ class RateLimiter:
         async with self._lock:
             now = datetime.now(UTC).timestamp()
             
-            # Remove old requests outside the window
             while self.requests and self.requests[0] < now - self.window_seconds:
                 self.requests.popleft()
             
-            # If at limit, wait until oldest request expires
             if len(self.requests) >= self.max_requests:
                 sleep_time = self.window_seconds - (now - self.requests[0]) + 0.1
                 _LOGGER.debug(
@@ -92,12 +77,10 @@ class RateLimiter:
                 )
                 await asyncio.sleep(sleep_time)
                 
-                # Clean up again after sleep
                 now = datetime.now(UTC).timestamp()
                 while self.requests and self.requests[0] < now - self.window_seconds:
                     self.requests.popleft()
             
-            # Record this request
             self.requests.append(now)
             
             if len(self.requests) > self.max_requests * 0.8:
@@ -109,7 +92,6 @@ class RateLimiter:
                 )
 
 
-# Global rate limiter instance
 _RATE_LIMITER = RateLimiter(max_requests=12, window_seconds=60)
 
 
@@ -165,18 +147,29 @@ def _display_name(product: dict[str, Any], lang_priority: list[str]) -> str | No
 async def _lookup_openfoodfacts(
     hass: HomeAssistant, ean: str, lang_priority: list[str], show_images: bool = True
 ) -> dict[str, Any] | None:
-    """Look up product in OpenFoodFacts API using official SDK."""
-
-    # Wait for rate limit slot
+    """Look up product in OpenFoodFacts using official library."""
     await _RATE_LIMITER.acquire()
 
-    # Get user agent with contact email
     config = hass.data[DOMAIN]["config"]
     email = config.get(CONF_CONTACT_EMAIL, DEFAULT_USER_EMAIL)
     user_agent = build_user_agent(email)
 
+    fields = [
+        "code", "product_name", "generic_name", "brands", "quantity",
+        "categories", "categories_tags",
+        "ingredients_text", "allergens", "traces", "additives_tags",
+        "nutrition_grades", "nutriments",
+        "image_url", "image_small_url", "image_front_url", 
+        "image_ingredients_url", "image_nutrition_url",
+        "labels", "labels_tags", "eco_score_grade", "nova_group",
+        "origins", "manufacturing_places", "countries", "stores",
+        "completeness", "last_modified_t",
+    ]
+    
+    for lang in lang_priority:
+        fields.append(f"product_name_{lang}")
+
     def _sync_lookup():
-        """Synchronous lookup using openfoodfacts library."""
         try:
             api = openfoodfacts.API(
                 user_agent=user_agent,
@@ -185,39 +178,13 @@ async def _lookup_openfoodfacts(
                 version="v2",
                 environment="org",
             )
-
-            fields = [
-                "code",
-                "product_name",
-                "brands",
-                "quantity",
-                "categories",
-                "ingredients_text",
-                "allergens",
-            ]
-
-            for lang in lang_priority:
-                fields.append(f"product_name_{lang}")
-
-            if show_images:
-                fields.extend(["image_url", "image_small_url"])
-
+            
             product = api.product.get(ean, fields=fields)
-
-            if not product:
-                return None
-
             return product
 
         except requests.exceptions.HTTPError as err:
-            # Handle rate limit exceeded (HTTP 503)
             if err.response.status_code == 503:
-                _LOGGER.warning(
-                    "OpenFoodFacts rate limit exceeded (HTTP 503). "
-                    "The request for EAN %s will be retried later.",
-                    ean,
-                )
-                # Return special marker to indicate rate limit
+                _LOGGER.warning("OpenFoodFacts rate limit (HTTP 503). EAN: %s", ean)
                 return {"_rate_limited": True}
             raise
         except Exception as err:
@@ -226,43 +193,10 @@ async def _lookup_openfoodfacts(
 
     product = await hass.async_add_executor_job(_sync_lookup)
 
-    # Check for rate limit marker
     if product and product.get("_rate_limited"):
-        _LOGGER.info(
-            "EAN %s lookup rate limited, will not cache as unknown", ean
-        )
         return None
 
-    if not product:
-        return None
-
-    name = _display_name(product, lang_priority)
-    if not name:
-        return None
-
-    result = {
-        "name": name,
-        "source": "openfoodfacts",
-        "product_name": _sanitize_text(product.get("product_name") or ""),
-        "brands": _sanitize_text(product.get("brands") or ""),
-        "quantity": _sanitize_text(product.get("quantity") or ""),
-        "categories": _sanitize_text(product.get("categories") or ""),
-        "ingredients": _sanitize_text(product.get("ingredients_text") or ""),
-        "allergens": _sanitize_text(product.get("allergens") or ""),
-    }
-
-    for lang in lang_priority:
-        key = f"product_name_{lang}"
-        if product.get(key):
-            result[key] = _sanitize_text(product[key])
-
-    if show_images:
-        if product.get("image_small_url"):
-            result["image_small_url"] = product["image_small_url"]
-        if product.get("image_url"):
-            result["image_url"] = product["image_url"]
-
-    return result
+    return product
 
 
 async def _notify_missing_product(
@@ -320,17 +254,17 @@ async def _notify_success(
 
 async def _resolve_name(
     hass: HomeAssistant,
-    store: MappingStore,
+    db: ProductDatabase,
     ean: str,
     config: dict[str, Any],
 ) -> tuple[str | None, str]:
     """Resolve product name from local DB or OpenFoodFacts."""
-    mapped = store.get_name(ean)
-    if mapped:
-        await store.async_increment_scan("local")
-        return mapped, "local"
+    product = db.get_product(ean)
+    if product:
+        await db.async_increment_scan("local")
+        return product.product_name, "local"
 
-    if await store.async_is_known_missing(ean):
+    if await db.async_is_known_missing(ean):
         _LOGGER.debug("EAN %s is known missing, skipping API call", ean)
         return None, "cached_missing"
 
@@ -338,94 +272,119 @@ async def _resolve_name(
     show_images = config.get(CONF_SHOW_IMAGES, DEFAULT_SHOW_IMAGES)
     
     try:
-        product = await _lookup_openfoodfacts(hass, ean, lang_priority, show_images)
+        api_data = await _lookup_openfoodfacts(hass, ean, lang_priority, show_images)
     except requests.exceptions.HTTPError as err:
         if err.response.status_code == 503:
-            # Rate limited - record and don't cache as unknown
-            from datetime import UTC, datetime
             hass.data[DOMAIN]["diagnostics"]["last_error"] = "Rate limit exceeded (HTTP 503)"
             hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
             hass.data[DOMAIN]["diagnostics"]["rate_limited_count"] += 1
-            _LOGGER.warning(
-                "Rate limited by OpenFoodFacts API. Try again later. EAN: %s", ean
-            )
+            _LOGGER.warning("Rate limited by OpenFoodFacts API. EAN: %s", ean)
             return None, "rate_limited"
-        # Record other HTTP errors
-        from datetime import UTC, datetime
         hass.data[DOMAIN]["diagnostics"]["last_error"] = f"HTTP {err.response.status_code}: {err}"
         hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
         hass.data[DOMAIN]["diagnostics"]["error_count"] += 1
         _LOGGER.error("HTTP error looking up EAN %s: %s", ean, err)
         return None, "error"
     except Exception as err:
-        # Record unexpected errors
-        from datetime import UTC, datetime
         hass.data[DOMAIN]["diagnostics"]["last_error"] = str(err)
         hass.data[DOMAIN]["diagnostics"]["last_error_time"] = datetime.now(UTC).isoformat()
         hass.data[DOMAIN]["diagnostics"]["error_count"] += 1
         _LOGGER.error("Unexpected error looking up EAN %s: %s", ean, err)
         return None, "error"
 
-    if product:
-        await store.async_set(ean, product["name"], product)
-        await store.async_increment_scan("openfoodfacts")
+    if not api_data:
+        unknown = await db.async_mark_unknown(ean)
+        hass.bus.async_fire(
+            EVENT_MISSING_PRODUCT,
+            {"ean": ean, "source": "openfoodfacts", "seen_count": unknown.seen_count},
+        )
         hass.bus.async_fire(
             EVENT_LOOKUP_COMPLETED,
-            {
-                "ean": ean,
-                "found": True,
-                "name": product["name"],
-                "source": "openfoodfacts",
-            },
+            {"ean": ean, "found": False, "name": None, "source": "openfoodfacts"},
         )
+        show_notifications = config.get(CONF_SHOW_NOTIFICATIONS, DEFAULT_SHOW_NOTIFICATIONS)
+        await _notify_missing_product(hass, ean, show_notifications)
         hass.bus.async_fire(EVENT_STATS_UPDATED, {})
-        return product["name"], "openfoodfacts"
+        return None, "missing"
 
-    # Only mark as unknown if we got a definitive "not found" response
-    unknown = await store.async_mark_unknown(ean)
-    hass.bus.async_fire(
-        EVENT_MISSING_PRODUCT,
-        {"ean": ean, "source": "openfoodfacts", "seen_count": unknown.get("seen_count")},
+    name = _display_name(api_data, lang_priority)
+    if not name:
+        await db.async_mark_unknown(ean)
+        return None, "missing"
+    
+    nutriments = api_data.get("nutriments", {})
+    
+    product_data = ProductData(
+        ean=ean,
+        product_name=name,
+        source="openfoodfacts",
+        brands=api_data.get("brands"),
+        quantity=api_data.get("quantity"),
+        categories=api_data.get("categories"),
+        ingredients_text=api_data.get("ingredients_text"),
+        allergens=api_data.get("allergens"),
+        traces=api_data.get("traces"),
+        nutrition_grades=api_data.get("nutrition_grades"),
+        energy_kcal=nutriments.get("energy-kcal_100g"),
+        energy_kj=nutriments.get("energy-kj_100g"),
+        fat=nutriments.get("fat_100g"),
+        saturated_fat=nutriments.get("saturated-fat_100g"),
+        carbohydrates=nutriments.get("carbohydrates_100g"),
+        sugars=nutriments.get("sugars_100g"),
+        fiber=nutriments.get("fiber_100g"),
+        proteins=nutriments.get("proteins_100g"),
+        salt=nutriments.get("salt_100g"),
+        sodium=nutriments.get("sodium_100g"),
+        image_url=api_data.get("image_url"),
+        image_small_url=api_data.get("image_small_url"),
+        image_front_url=api_data.get("image_front_url"),
+        image_ingredients_url=api_data.get("image_ingredients_url"),
+        image_nutrition_url=api_data.get("image_nutrition_url"),
+        eco_score_grade=api_data.get("eco_score_grade"),
+        nova_group=api_data.get("nova_group"),
+        origins=api_data.get("origins"),
+        manufacturing_places=api_data.get("manufacturing_places"),
+        countries=api_data.get("countries"),
+        stores=api_data.get("stores"),
+        completeness=api_data.get("completeness"),
+        last_modified_t=api_data.get("last_modified_t"),
     )
+    
+    for lang in lang_priority:
+        key = f"product_name_{lang}"
+        if api_data.get(key):
+            setattr(product_data, key, api_data[key])
+    
+    await db.async_add_product(product_data)
+    await db.async_increment_scan("openfoodfacts")
+    
     hass.bus.async_fire(
         EVENT_LOOKUP_COMPLETED,
-        {"ean": ean, "found": False, "name": None, "source": "openfoodfacts"},
+        {
+            "ean": ean,
+            "found": True,
+            "name": name,
+            "source": "openfoodfacts",
+        },
     )
-
-    show_notifications = config.get(CONF_SHOW_NOTIFICATIONS, DEFAULT_SHOW_NOTIFICATIONS)
-    await _notify_missing_product(hass, ean, show_notifications)
     hass.bus.async_fire(EVENT_STATS_UPDATED, {})
-
-    return None, "missing"
-
-
-async def _add_to_shopping_list(hass: HomeAssistant, name: str) -> bool:
-    """Add item to Home Assistant shopping list."""
-    if not hass.services.has_service("shopping_list", "add_item"):
-        _LOGGER.warning(
-            "shopping_list.add_item is not available. Enable the Shopping List integration."
-        )
-        return False
-
-    await hass.services.async_call(
-        "shopping_list", "add_item", {"name": name}, blocking=False
-    )
-    return True
+    
+    return name, "openfoodfacts"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up EAN Reader from YAML configuration (legacy support)."""
+    """Set up EAN Reader from YAML configuration."""
     hass.data.setdefault(DOMAIN, {})
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up EAN Reader from a config entry."""
-    store = MappingStore(hass)
-    await store.async_load()
+    db = ProductDatabase(hass)
+    await db.async_load()
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN]["store"] = store
+    hass.data[DOMAIN]["db"] = db
     hass.data[DOMAIN]["tasks"] = set()
     hass.data[DOMAIN]["config"] = entry.options.copy()
     hass.data[DOMAIN]["diagnostics"] = {
@@ -436,12 +395,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    await _async_register_services(hass, store, entry)
+    await _async_register_services(hass, db, entry)
 
     @callback
     def _handle_share_event(event) -> None:
-        """Handle mobile_app.share events for barcode scanning."""
         text = event.data.get("text") or event.data.get("url") or ""
         ean = _clean_ean(text)
         if not _valid_ean(ean):
@@ -449,7 +406,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         async def _process_scan() -> None:
             config = hass.data[DOMAIN]["config"]
-            name, source = await _resolve_name(hass, store, ean, config)
+            name, source = await _resolve_name(hass, db, ean, config)
 
             hass.bus.async_fire(
                 EVENT_PRODUCT_SCANNED,
@@ -457,8 +414,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
 
             if name and config.get(CONF_AUTO_ADD_TO_SHOPPING_LIST, DEFAULT_AUTO_ADD):
-                success = await _add_to_shopping_list(hass, name)
-                if success and config.get(CONF_SHOW_NOTIFICATIONS, DEFAULT_SHOW_NOTIFICATIONS):
+                await db.async_add_to_shopping_list(ean)
+                if config.get(CONF_SHOW_NOTIFICATIONS, DEFAULT_SHOW_NOTIFICATIONS):
                     await _notify_success(hass, name, True)
             elif not name:
                 _LOGGER.info("EAN %s is unknown. Waiting for local mapping.", ean)
@@ -499,7 +456,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
-        hass.data[DOMAIN].pop("store", None)
+        hass.data[DOMAIN].pop("db", None)
         hass.data[DOMAIN].pop("config", None)
         hass.data[DOMAIN].pop("tasks", None)
 
@@ -523,10 +480,10 @@ async def _handle_webhook(
         if not _valid_ean(ean):
             return {"status": "error", "message": "Invalid EAN format"}
 
-        store = hass.data[DOMAIN]["store"]
+        db = hass.data[DOMAIN]["db"]
         config = hass.data[DOMAIN]["config"]
 
-        name, source = await _resolve_name(hass, store, ean, config)
+        name, source = await _resolve_name(hass, db, ean, config)
 
         result = {
             "status": "success",
@@ -536,23 +493,22 @@ async def _handle_webhook(
         }
 
         if name and config.get(CONF_AUTO_ADD_TO_SHOPPING_LIST, DEFAULT_AUTO_ADD):
-            await _add_to_shopping_list(hass, name)
+            await db.async_add_to_shopping_list(ean)
             result["added_to_list"] = True
 
         return result
 
-    except Exception as err:  # pylint: disable=broad-except
+    except Exception as err:
         _LOGGER.error("Webhook error: %s", err)
         return {"status": "error", "message": str(err)}
 
 
 async def _async_register_services(
-    hass: HomeAssistant, store: MappingStore, entry: ConfigEntry
+    hass: HomeAssistant, db: ProductDatabase, entry: ConfigEntry
 ) -> None:
     """Register all services for EAN Reader."""
 
     async def svc_add_mapping(call: ServiceCall) -> None:
-        """Add or update EAN mapping."""
         ean_raw = call.data.get("ean")
         if not ean_raw:
             _LOGGER.error("EAN is required for add_mapping service")
@@ -567,7 +523,7 @@ async def _async_register_services(
             return
 
         name = _sanitize_text(name)
-        await store.async_set(ean, name, {"source": "manual"})
+        product = await db.async_add_manual_product(ean, name)
 
         hass.bus.async_fire(
             EVENT_MAPPING_ADDED, {"ean": ean, "name": name, "source": "manual"}
@@ -586,8 +542,7 @@ async def _async_register_services(
             )
 
     async def svc_add_last_missing_mapping(call: ServiceCall) -> None:
-        """Map the last unknown scanned EAN."""
-        ean = store.last_missing_ean
+        ean = db.last_missing_ean
         name = str(call.data.get("name") or "").strip()
         add_to_list = bool(call.data.get("add_to_shopping_list", True))
 
@@ -596,7 +551,7 @@ async def _async_register_services(
             return
 
         name = _sanitize_text(name)
-        await store.async_set(ean, name, {"source": "manual", "created_from": "last_missing"})
+        await db.async_add_manual_product(ean, name)
 
         hass.bus.async_fire(
             EVENT_MAPPING_ADDED, {"ean": ean, "name": name, "source": "manual"}
@@ -615,7 +570,6 @@ async def _async_register_services(
             await _add_to_shopping_list(hass, name)
 
     async def svc_remove_mapping(call: ServiceCall) -> None:
-        """Remove an EAN mapping."""
         ean_raw = call.data.get("ean")
         if not ean_raw:
             _LOGGER.error("EAN is required for remove_mapping service")
@@ -626,12 +580,11 @@ async def _async_register_services(
             _LOGGER.warning("Invalid EAN: ean=%r", ean)
             return
 
-        await store.async_delete(ean)
+        await db.async_delete_product(ean)
         hass.bus.async_fire(EVENT_MAPPING_REMOVED, {"ean": ean})
         hass.bus.async_fire(EVENT_STATS_UPDATED, {})
 
     async def svc_lookup_product(call: ServiceCall) -> None:
-        """Look up product in OpenFoodFacts."""
         ean_raw = call.data.get("ean")
         if not ean_raw:
             _LOGGER.error("EAN is required for lookup_product service")
@@ -643,11 +596,12 @@ async def _async_register_services(
             return
 
         config = hass.data[DOMAIN]["config"]
-        await _resolve_name(hass, store, ean, config)
+        await _resolve_name(hass, db, ean, config)
 
     async def svc_add_scanned(call: ServiceCall) -> None:
-        """Add scanned EAN to shopping list."""
         ean_raw = call.data.get("ean")
+        quantity = call.data.get("quantity")
+        
         if not ean_raw:
             _LOGGER.error("EAN is required for add_scanned_to_shopping_list service")
             return
@@ -658,34 +612,80 @@ async def _async_register_services(
             return
 
         config = hass.data[DOMAIN]["config"]
-        name, _source = await _resolve_name(hass, store, ean, config)
+        name, _source = await _resolve_name(hass, db, ean, config)
 
         if name:
-            await _add_to_shopping_list(hass, name)
+            await db.async_add_to_shopping_list(ean, quantity)
+            hass.bus.async_fire(EVENT_STATS_UPDATED, {})
+            _LOGGER.info("Added %s to shopping list", name)
         else:
             _LOGGER.info(
                 "EAN %s is unknown. Add a mapping with ean_reader.add_last_missing_mapping.",
                 ean,
             )
+    
+    async def svc_remove_from_list(call: ServiceCall) -> None:
+        ean_raw = call.data.get("ean")
+        if not ean_raw:
+            _LOGGER.error("EAN is required for remove_from_shopping_list service")
+            return
+        
+        ean = _clean_ean(ean_raw)
+        if not _valid_ean(ean):
+            _LOGGER.warning("Invalid EAN: ean=%r", ean)
+            return
+        
+        product = await db.async_remove_from_shopping_list(ean)
+        if product:
+            hass.bus.async_fire(EVENT_STATS_UPDATED, {})
+            _LOGGER.info("Removed %s from shopping list", product.product_name)
+    
+    async def svc_update_list_quantity(call: ServiceCall) -> None:
+        ean_raw = call.data.get("ean")
+        quantity = call.data.get("quantity", "")
+        
+        if not ean_raw:
+            _LOGGER.error("EAN is required for update_shopping_list_quantity service")
+            return
+        
+        ean = _clean_ean(ean_raw)
+        if not _valid_ean(ean):
+            _LOGGER.warning("Invalid EAN: ean=%r", ean)
+            return
+        
+        await db.async_update_shopping_list_quantity(ean, quantity)
+        hass.bus.async_fire(EVENT_STATS_UPDATED, {})
+    
+    async def svc_clear_shopping_list(call: ServiceCall) -> None:
+        count = await db.async_clear_shopping_list()
+        hass.bus.async_fire(EVENT_STATS_UPDATED, {})
+        _LOGGER.info("Cleared %d items from shopping list", count)
+    
+    async def svc_get_shopping_list(call: ServiceCall) -> None:
+        items = db.get_shopping_list()
+        hass.bus.async_fire(
+            f"{DOMAIN}_shopping_list",
+            {
+                "items": [item.to_dict() for item in items],
+                "count": len(items)
+            },
+        )
 
     async def svc_list_unknowns(call: ServiceCall) -> None:
-        """List all unknown products."""
-        unknowns = list(store.unknowns.values())
+        unknowns = [u.to_dict() for u in db.unknowns.values()]
         hass.bus.async_fire(
             f"{DOMAIN}_unknowns_list",
             {"unknowns": unknowns, "count": len(unknowns)},
         )
 
     async def svc_export_mappings(call: ServiceCall) -> None:
-        """Export all mappings to a file."""
-        export_data = await store.async_export_mappings()
+        export_data = await db.async_export()
         hass.bus.async_fire(
             f"{DOMAIN}_export_complete",
-            {"data": export_data, "count": len(export_data.get("mappings", {}))},
+            {"data": export_data, "count": len(export_data.get("products", {}))},
         )
 
     async def svc_import_mappings(call: ServiceCall) -> None:
-        """Import mappings from data."""
         data = call.data.get("data")
         merge = bool(call.data.get("merge", True))
 
@@ -694,7 +694,7 @@ async def _async_register_services(
             return
 
         try:
-            count = await store.async_import_mappings(data, merge)
+            count = await db.async_import(data, merge)
             hass.bus.async_fire(
                 f"{DOMAIN}_import_complete",
                 {"imported_count": count},
@@ -704,7 +704,6 @@ async def _async_register_services(
             _LOGGER.error("Import failed: %s", err)
 
     async def svc_add_price(call: ServiceCall) -> None:
-        """Add price tracking entry."""
         if not entry.options.get(CONF_TRACK_PRICES, DEFAULT_TRACK_PRICES):
             _LOGGER.warning("Price tracking is not enabled")
             return
@@ -717,6 +716,7 @@ async def _async_register_services(
         ean = _clean_ean(ean_raw)
         price = call.data.get("price")
         currency = call.data.get("currency", "SEK")
+        store = call.data.get("store")
 
         if not _valid_ean(ean) or price is None:
             _LOGGER.warning("Invalid EAN or price: ean=%r price=%r", ean, price)
@@ -724,12 +724,11 @@ async def _async_register_services(
 
         try:
             price_float = float(price)
-            await store.async_add_price(ean, price_float, currency)
+            await db.async_add_price(ean, price_float, currency, store)
         except ValueError:
             _LOGGER.error("Invalid price value: %s", price)
 
     async def svc_set_expiry(call: ServiceCall) -> None:
-        """Set expiry date for a product."""
         if not entry.options.get(CONF_TRACK_EXPIRY, DEFAULT_TRACK_EXPIRY):
             _LOGGER.warning("Expiry tracking is not enabled")
             return
@@ -746,7 +745,7 @@ async def _async_register_services(
             _LOGGER.warning("Invalid EAN or expiry_date: ean=%r expiry=%r", ean, expiry_date)
             return
 
-        await store.async_set_expiry(ean, expiry_date)
+        await db.async_set_expiry(ean, expiry_date)
 
     hass.services.async_register(DOMAIN, "add_mapping", svc_add_mapping)
     hass.services.async_register(DOMAIN, "add_last_missing_mapping", svc_add_last_missing_mapping)
@@ -758,3 +757,9 @@ async def _async_register_services(
     hass.services.async_register(DOMAIN, "import_mappings", svc_import_mappings)
     hass.services.async_register(DOMAIN, "add_price", svc_add_price)
     hass.services.async_register(DOMAIN, "set_expiry", svc_set_expiry)
+    
+    # Shopping list services
+    hass.services.async_register(DOMAIN, "remove_from_shopping_list", svc_remove_from_list)
+    hass.services.async_register(DOMAIN, "update_shopping_list_quantity", svc_update_list_quantity)
+    hass.services.async_register(DOMAIN, "clear_shopping_list", svc_clear_shopping_list)
+    hass.services.async_register(DOMAIN, "get_shopping_list", svc_get_shopping_list)
