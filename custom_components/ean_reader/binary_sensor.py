@@ -75,3 +75,19 @@ class EANReaderAPIDiagnostic(BinarySensorEntity):
             attrs[ATTR_LAST_ERROR_TIME] = last_error_time
 
         return attrs
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks."""
+
+        @callback
+        def _handle_event(event):
+            """Handle diagnostic update events."""
+            self.async_schedule_update_ha_state()
+
+        # Listen to any event that might change diagnostics
+        self.async_on_remove(
+            self.hass.bus.async_listen("ean_reader_stats_updated", _handle_event)
+        )
+        self.async_on_remove(
+            self.hass.bus.async_listen("ean_reader_lookup_completed", _handle_event)
+        )
