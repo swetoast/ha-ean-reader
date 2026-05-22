@@ -25,7 +25,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up EAN Reader binary sensor based on a config entry."""
-    async_add_entities([EANReaderAPIDiagnostic(config_entry)], True)
+    async_add_entities([EANReaderAPIDiagnostic(hass, config_entry)], True)
 
 
 class EANReaderAPIDiagnostic(BinarySensorEntity):
@@ -36,8 +36,9 @@ class EANReaderAPIDiagnostic(BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_category = "diagnostic"
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize the diagnostic sensor."""
+        self.hass = hass
         self._attr_unique_id = f"{config_entry.entry_id}_api_diagnostic"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, config_entry.entry_id)},
