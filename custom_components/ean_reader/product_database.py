@@ -49,6 +49,55 @@ class ProductData:
     salt: float | None = None
     sodium: float | None = None
     
+    # Serving information (how people actually consume)
+    serving_size: str | None = None          # "150g", "1 cup (250ml)", "1 bottle"
+    serving_quantity: float | None = None     # Numeric value for calculations
+    
+    # Detailed fats (per 100g)
+    monounsaturated_fat: float | None = None
+    polyunsaturated_fat: float | None = None
+    trans_fat: float | None = None
+    cholesterol: float | None = None
+    omega_3_fat: float | None = None
+    omega_6_fat: float | None = None
+    
+    # Vitamins (per 100g)
+    vitamin_a: float | None = None
+    vitamin_c: float | None = None
+    vitamin_d: float | None = None
+    vitamin_e: float | None = None
+    vitamin_k: float | None = None
+    vitamin_b1: float | None = None          # Thiamin
+    vitamin_b2: float | None = None          # Riboflavin
+    vitamin_b6: float | None = None
+    vitamin_b9: float | None = None          # Folate
+    vitamin_b12: float | None = None
+    
+    # Minerals (per 100g)
+    calcium: float | None = None
+    iron: float | None = None
+    magnesium: float | None = None
+    phosphorus: float | None = None
+    potassium: float | None = None
+    zinc: float | None = None
+    
+    # Special content (per 100g)
+    alcohol: float | None = None              # % vol
+    caffeine: float | None = None             # mg
+    
+    # Packaging & sustainability
+    packaging: str | None = None              # "Plastic bottle", "Cardboard box"
+    packaging_tags: list[str] = field(default_factory=list)
+    recycling_instructions: str | None = None
+    carbon_footprint: float | None = None     # CO2 equivalent per 100g
+    
+    # Additional metadata
+    generic_name: str | None = None           # Generic product name
+    ingredients_from_palm_oil: list[str] = field(default_factory=list)
+    ingredients_analysis_vegan: str | None = None      # "yes", "no", "maybe"
+    ingredients_analysis_vegetarian: str | None = None  # "yes", "no", "maybe"
+    ingredients_analysis_palm_oil: str | None = None    # "yes", "no", "maybe"
+    
     # Images
     image_url: str | None = None
     image_small_url: str | None = None

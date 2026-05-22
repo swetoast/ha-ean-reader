@@ -164,6 +164,15 @@ async def _lookup_openfoodfacts(
         "labels", "labels_tags", "eco_score_grade", "nova_group",
         "origins", "manufacturing_places", "countries", "stores",
         "completeness", "last_modified_t",
+        # Serving & packaging
+        "serving_size", "serving_quantity",
+        "packaging", "packaging_tags",
+        "recycling_instructions_to_recycle",
+        # Ingredients analysis
+        "ingredients_from_palm_oil_tags",
+        "ingredients_analysis_tags",
+        # Environmental
+        "carbon-footprint_100g",
     ]
     
     for lang in lang_priority:
@@ -313,6 +322,24 @@ async def _resolve_name(
         return None, "missing"
     
     nutriments = api_data.get("nutriments", {})
+    labels_tags = api_data.get("labels_tags", [])
+    additives_tags = api_data.get("additives_tags", [])
+    packaging_tags = api_data.get("packaging_tags", [])
+    palm_oil_tags = api_data.get("ingredients_from_palm_oil_tags", [])
+    
+    # Parse ingredients analysis
+    ingredients_analysis = api_data.get("ingredients_analysis_tags", [])
+    vegan = "maybe"
+    vegetarian = "maybe"
+    palm_oil_free = "maybe"
+    
+    for tag in ingredients_analysis:
+        if "vegan" in tag:
+            vegan = "yes" if "en:vegan" in tag else "no"
+        if "vegetarian" in tag:
+            vegetarian = "yes" if "en:vegetarian" in tag else "no"
+        if "palm" in tag:
+            palm_oil_free = "no" if "en:palm-oil" in tag else "yes"
     
     product_data = ProductData(
         ean=ean,
@@ -321,10 +348,14 @@ async def _resolve_name(
         brands=api_data.get("brands"),
         quantity=api_data.get("quantity"),
         categories=api_data.get("categories"),
+        generic_name=api_data.get("generic_name"),
         ingredients_text=api_data.get("ingredients_text"),
         allergens=api_data.get("allergens"),
         traces=api_data.get("traces"),
+        additives=additives_tags if isinstance(additives_tags, list) else [],
         nutrition_grades=api_data.get("nutrition_grades"),
+        
+        # Basic nutrition (per 100g)
         energy_kcal=nutriments.get("energy-kcal_100g"),
         energy_kj=nutriments.get("energy-kj_100g"),
         fat=nutriments.get("fat_100g"),
@@ -335,17 +366,74 @@ async def _resolve_name(
         proteins=nutriments.get("proteins_100g"),
         salt=nutriments.get("salt_100g"),
         sodium=nutriments.get("sodium_100g"),
+        
+        # Serving information
+        serving_size=api_data.get("serving_size"),
+        serving_quantity=api_data.get("serving_quantity"),
+        
+        # Detailed fats (per 100g)
+        monounsaturated_fat=nutriments.get("monounsaturated-fat_100g"),
+        polyunsaturated_fat=nutriments.get("polyunsaturated-fat_100g"),
+        trans_fat=nutriments.get("trans-fat_100g"),
+        cholesterol=nutriments.get("cholesterol_100g"),
+        omega_3_fat=nutriments.get("omega-3-fat_100g"),
+        omega_6_fat=nutriments.get("omega-6-fat_100g"),
+        
+        # Vitamins (per 100g)
+        vitamin_a=nutriments.get("vitamin-a_100g"),
+        vitamin_c=nutriments.get("vitamin-c_100g"),
+        vitamin_d=nutriments.get("vitamin-d_100g"),
+        vitamin_e=nutriments.get("vitamin-e_100g"),
+        vitamin_k=nutriments.get("vitamin-k_100g"),
+        vitamin_b1=nutriments.get("vitamin-b1_100g"),
+        vitamin_b2=nutriments.get("vitamin-b2_100g"),
+        vitamin_b6=nutriments.get("vitamin-b6_100g"),
+        vitamin_b9=nutriments.get("vitamin-b9_100g"),
+        vitamin_b12=nutriments.get("vitamin-b12_100g"),
+        
+        # Minerals (per 100g)
+        calcium=nutriments.get("calcium_100g"),
+        iron=nutriments.get("iron_100g"),
+        magnesium=nutriments.get("magnesium_100g"),
+        phosphorus=nutriments.get("phosphorus_100g"),
+        potassium=nutriments.get("potassium_100g"),
+        zinc=nutriments.get("zinc_100g"),
+        
+        # Special content
+        alcohol=nutriments.get("alcohol_100g"),
+        caffeine=nutriments.get("caffeine_100g"),
+        
+        # Packaging & sustainability
+        packaging=api_data.get("packaging"),
+        packaging_tags=packaging_tags if isinstance(packaging_tags, list) else [],
+        recycling_instructions=api_data.get("recycling_instructions_to_recycle"),
+        carbon_footprint=nutriments.get("carbon-footprint_100g"),
+        
+        # Ingredients analysis
+        ingredients_from_palm_oil=palm_oil_tags if isinstance(palm_oil_tags, list) else [],
+        ingredients_analysis_vegan=vegan,
+        ingredients_analysis_vegetarian=vegetarian,
+        ingredients_analysis_palm_oil=palm_oil_free,
+        
+        # Images
         image_url=api_data.get("image_url"),
         image_small_url=api_data.get("image_small_url"),
         image_front_url=api_data.get("image_front_url"),
         image_ingredients_url=api_data.get("image_ingredients_url"),
         image_nutrition_url=api_data.get("image_nutrition_url"),
+        
+        # Labels & scores
+        labels=labels_tags if isinstance(labels_tags, list) else [],
         eco_score_grade=api_data.get("eco_score_grade"),
         nova_group=api_data.get("nova_group"),
+        
+        # Origins
         origins=api_data.get("origins"),
         manufacturing_places=api_data.get("manufacturing_places"),
         countries=api_data.get("countries"),
         stores=api_data.get("stores"),
+        
+        # Metadata
         completeness=api_data.get("completeness"),
         last_modified_t=api_data.get("last_modified_t"),
     )
