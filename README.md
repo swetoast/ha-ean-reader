@@ -73,7 +73,7 @@ This integration uses the [OpenFoodFacts](https://world.openfoodfacts.org/) data
 3. Search for "EAN Reader"
 4. **Enter your contact email** (required by OpenFoodFacts for API identification)
    - Format: `your-email@example.com`
-   - Used in User-Agent: `HomeAssistant-EANReader/1.0.0 (your-email@example.com)`
+   - Used in User-Agent: `HomeAssistant-EANReader/1.0.1 (your-email@example.com)`
    - Helps OpenFoodFacts identify your integration
 5. Configure optional features:
    - Auto-add to shopping list (default: ON)

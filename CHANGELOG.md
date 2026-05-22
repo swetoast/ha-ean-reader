@@ -5,7 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-05-22
+## [1.0.1] - 2026-05-22
+
+### Added
+- **Shopping List Sensor**: New `sensor.ean_reader_shopping_list` that exposes shopping list items with full product data
+- **Comprehensive Product Fields**: Added 43 new API fields from OpenFoodFacts (95+ total fields)
+  - Serving information (serving_size, serving_quantity)
+  - Detailed fats (monounsaturated, polyunsaturated, trans fat, cholesterol, omega-3, omega-6)
+  - Complete vitamin profile (A, C, D, E, K, B1, B2, B6, B9, B12)
+  - Complete mineral profile (calcium, iron, magnesium, phosphorus, potassium, zinc)
+  - Special content (alcohol, caffeine)
+  - Packaging & sustainability (packaging, recycling instructions, carbon footprint)
+  - Ingredients analysis (vegan, vegetarian, palm oil detection)
+  - Additional metadata (generic_name, labels, additives)
+
+### Changed
+- Shopping list data now accessible via dedicated sensor with `products` attribute array
+- Product database now stores 95+ fields per product (up from 52)
+- Enhanced product data extraction from OpenFoodFacts API
+
+### Fixed
+- Shopping list sensor properly updates when items added/removed
+- Card reactivity fixed with proper LitElement state updates
+
+## [1.0.0] - 2025-01-XX
 
 ### Added
 - Initial release of EAN Reader integration
