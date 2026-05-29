@@ -302,6 +302,51 @@ class ProductDatabase:
         )
         await self.async_add_product(product)
         return product
+
+    # Fields a user is allowed to edit directly on a product.
+    EDITABLE_FIELDS: tuple[str, ...] = (
+        "product_name", "brands", "quantity", "categories",
+        "ingredients_text", "allergens", "traces", "labels",
+        "stores", "origins", "packaging", "notes",
+    )
+
+    async def async_update_product_fields(
+        self, ean: str, fields: dict[str, Any]
+    ) -> ProductData:
+        """Apply a partial edit to a product, creating it if needed.
+
+        Only the keys present in ``fields`` (and non-None) are written, so
+        existing OpenFoodFacts-derived data is preserved. An EAN that was in
+        the unknowns list is promoted to a real product.
+        """
+        product = self.products.get(ean)
+        created = product is None
+        if product is None:
+            product = ProductData(
+                ean=ean,
+                product_name=str(fields.get("product_name") or "Unknown Product"),
+                source="manual",
+            )
+
+        for key, value in fields.items():
+            if value is None or key not in self.EDITABLE_FIELDS:
+                continue
+            setattr(product, key, value)
+
+        # If a user edits an OFF product, keep provenance but note local edits.
+        if not created and product.source == "openfoodfacts":
+            product.source = "openfoodfacts+manual"
+
+        product.last_updated = _utcnow()
+        self.products[ean] = product
+
+        # Promote out of unknowns.
+        self.unknowns.pop(ean, None)
+        if self.last_missing_ean == ean:
+            self.last_missing_ean = None
+
+        await self.async_save()
+        return product
     
     async def async_delete_product(self, ean: str) -> None:
         """Delete a product and all associated data."""
@@ -401,10 +446,14 @@ class ProductDatabase:
             product.favorite = favorite
             await self.async_save()
     
-    async def async_increment_scan(self, source: str = "unknown") -> None:
+    async def async_increment_scan(
+        self, source: str = "unknown", ean: str | None = None
+    ) -> None:
         """Increment scan statistics."""
         self.statistics["total_scans"] = self.statistics.get("total_scans", 0) + 1
         self.statistics["last_scan_time"] = _utcnow()
+        if ean:
+            self.statistics["last_scan"] = ean
         
         if source == "openfoodfacts":
             self.statistics["openfoodfacts_hits"] = (

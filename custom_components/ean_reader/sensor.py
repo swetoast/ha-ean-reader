@@ -1,6 +1,8 @@
 """Sensor platform for EAN Reader integration."""
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -59,7 +61,7 @@ class EANReaderStatsSensor(SensorEntity):
         return self._db.statistics.get("total_scans", 0)
 
     @property
-    def extra_state_attributes(self) -> dict[str, any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional attributes."""
         attrs = {
             ATTR_TOTAL_MAPPINGS: len(self._db.products),
@@ -67,7 +69,7 @@ class EANReaderStatsSensor(SensorEntity):
             ATTR_TOTAL_SCANS: self._db.statistics.get("total_scans", 0),
             ATTR_OPENFOODFACTS_HITS: self._db.statistics.get("openfoodfacts_hits", 0),
             ATTR_LOCAL_HITS: self._db.statistics.get("local_hits", 0),
-            ATTR_LAST_SCAN: self._db.last_missing_ean,
+            ATTR_LAST_SCAN: self._db.statistics.get("last_scan"),
         }
 
         last_scan_time = self._db.statistics.get("last_scan_time")
@@ -114,7 +116,7 @@ class EANReaderUnknownsSensor(SensorEntity):
         return len(self._db.unknowns)
 
     @property
-    def extra_state_attributes(self) -> dict[str, any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return the list of unknown EANs."""
         unknowns_list = []
         for ean, unknown in self._db.unknowns.items():

@@ -179,3 +179,240 @@ clear_shopping_list:
 get_shopping_list:
   name: Get Shopping List
   description: Get all items in shopping list (fires event with list)
+
+update_product:
+  name: Update / edit product
+  description: >-
+    Add or edit product details for an EAN. Resolves an unknown item into a
+    named product. Only the fields you provide are changed; existing data is
+    preserved. Optionally submit the result to OpenFoodFacts.
+  fields:
+    ean:
+      required: true
+      example: "7318690101234"
+      description: The EAN/UPC barcode number (8-14 digits)
+      selector:
+        text:
+    name:
+      required: false
+      example: "Oatly Oat Milk 1L"
+      description: Product name
+      selector:
+        text:
+    brands:
+      required: false
+      example: "Oatly"
+      description: Brand name(s)
+      selector:
+        text:
+    quantity:
+      required: false
+      example: "1L"
+      description: Net quantity (e.g. "1L", "500g")
+      selector:
+        text:
+    categories:
+      required: false
+      example: "Plant-based milk, Oat drinks"
+      description: Comma-separated categories
+      selector:
+        text:
+    ingredients_text:
+      required: false
+      example: "Water, oats (10%), rapeseed oil, salt"
+      description: Ingredients list as printed on the package
+      selector:
+        text:
+          multiline: true
+    allergens:
+      required: false
+      example: "Oats, gluten"
+      description: Allergens
+      selector:
+        text:
+    labels:
+      required: false
+      example: "Organic, Vegan"
+      description: Comma-separated labels/certifications
+      selector:
+        text:
+    stores:
+      required: false
+      example: "ICA, Coop"
+      description: Stores where the product is sold
+      selector:
+        text:
+    origins:
+      required: false
+      example: "Sweden"
+      description: Origin of the product or ingredients
+      selector:
+        text:
+    packaging:
+      required: false
+      example: "Carton"
+      description: Packaging description
+      selector:
+        text:
+    notes:
+      required: false
+      example: "Local store brand"
+      description: Free-text notes (local only, not submitted)
+      selector:
+        text:
+          multiline: true
+    add_to_shopping_list:
+      required: false
+      default: false
+      description: Add to the shopping list after editing
+      selector:
+        boolean:
+    submit_to_openfoodfacts:
+      required: false
+      default: false
+      description: >-
+        Submit these details to OpenFoodFacts. Requires OpenFoodFacts
+        submission to be enabled with credentials in the integration options.
+      selector:
+        boolean:
+    include_nutrition:
+      required: false
+      default: false
+      description: >-
+        Also submit stored per-100g nutrition values (energy, fat, carbs,
+        sugars, fibre, protein, salt) when submitting to OpenFoodFacts.
+      selector:
+        boolean:
+    username:
+      required: false
+      description: >-
+        OpenFoodFacts username override (used instead of the stored one,
+        so credentials need not be saved in the integration options).
+      selector:
+        text:
+    password:
+      required: false
+      description: OpenFoodFacts password override (not stored)
+      selector:
+        text:
+          type: password
+
+submit_to_openfoodfacts:
+  name: Submit to OpenFoodFacts
+  description: >-
+    Submit a product's details to the OpenFoodFacts database. Requires
+    OpenFoodFacts submission to be enabled with an account in the integration
+    options. Any fields supplied here are saved locally first, then submitted.
+  fields:
+    ean:
+      required: true
+      example: "7318690101234"
+      description: The EAN/UPC barcode number to submit
+      selector:
+        text:
+    name:
+      required: false
+      example: "Oatly Oat Milk 1L"
+      description: Product name (optional override)
+      selector:
+        text:
+    brands:
+      required: false
+      example: "Oatly"
+      description: Brand name(s) (optional override)
+      selector:
+        text:
+    quantity:
+      required: false
+      example: "1L"
+      description: Net quantity (optional override)
+      selector:
+        text:
+    categories:
+      required: false
+      example: "Plant-based milk"
+      description: Comma-separated categories (optional override)
+      selector:
+        text:
+    ingredients_text:
+      required: false
+      description: Ingredients list (optional override)
+      selector:
+        text:
+          multiline: true
+    labels:
+      required: false
+      example: "Organic, Vegan"
+      description: Comma-separated labels (optional override)
+      selector:
+        text:
+    include_nutrition:
+      required: false
+      default: false
+      description: >-
+        Also submit stored per-100g nutrition values (energy, fat, carbs,
+        sugars, fibre, protein, salt).
+      selector:
+        boolean:
+    username:
+      required: false
+      description: >-
+        OpenFoodFacts username override (used instead of the stored one).
+      selector:
+        text:
+    password:
+      required: false
+      description: OpenFoodFacts password override (not stored)
+      selector:
+        text:
+          type: password
+
+upload_image_to_openfoodfacts:
+  name: Upload product image to OpenFoodFacts
+  description: >-
+    Upload a local image file for a product to OpenFoodFacts and optionally
+    select it as the front/ingredients/nutrition/packaging image. Requires
+    OpenFoodFacts submission enabled with an account. The image file must be in
+    a directory allowed by Home Assistant (allowlist_external_dirs).
+  fields:
+    ean:
+      required: true
+      example: "7318690101234"
+      description: The EAN/UPC barcode number
+      selector:
+        text:
+    image_path:
+      required: true
+      example: "/media/scans/7318690101234.jpg"
+      description: Absolute path to the image file on the Home Assistant host
+      selector:
+        text:
+    image_field:
+      required: false
+      example: "front"
+      description: Which product image this is (optional)
+      selector:
+        select:
+          options:
+            - "front"
+            - "ingredients"
+            - "nutrition"
+            - "packaging"
+    language:
+      required: false
+      default: "en"
+      example: "en"
+      description: Two-letter language code to select the image for
+      selector:
+        text:
+    username:
+      required: false
+      description: OpenFoodFacts username override (used instead of the stored one)
+      selector:
+        text:
+    password:
+      required: false
+      description: OpenFoodFacts password override (not stored)
+      selector:
+        text:
+          type: password

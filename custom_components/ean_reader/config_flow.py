@@ -8,19 +8,30 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import (
     CONF_AUTO_ADD_TO_SHOPPING_LIST,
     CONF_CONTACT_EMAIL,
+    CONF_ENABLE_OFF_SUBMISSION,
     CONF_ENABLE_WEBHOOK,
     CONF_LANGUAGE_PRIORITY,
+    CONF_OFF_PASSWORD,
+    CONF_OFF_TEST_MODE,
+    CONF_OFF_USERNAME,
     CONF_SHOW_IMAGES,
     CONF_SHOW_NOTIFICATIONS,
     CONF_TRACK_EXPIRY,
     CONF_TRACK_PRICES,
     DEFAULT_AUTO_ADD,
+    DEFAULT_ENABLE_OFF_SUBMISSION,
     DEFAULT_ENABLE_WEBHOOK,
     DEFAULT_LANGUAGE_PRIORITY,
+    DEFAULT_OFF_TEST_MODE,
     DEFAULT_SHOW_IMAGES,
     DEFAULT_SHOW_NOTIFICATIONS,
     DEFAULT_TRACK_EXPIRY,
@@ -28,6 +39,15 @@ from .const import (
     DEFAULT_USER_EMAIL,
     DOMAIN,
 )
+
+
+def _lang_priority_to_str(value: Any) -> str:
+    """Render a stored language priority (list or string) as CSV for the form."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return ",".join(str(item) for item in value)
+    return ",".join(DEFAULT_LANGUAGE_PRIORITY)
 
 
 class EANReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -106,6 +126,12 @@ class EANReaderOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
+            raw_priority = user_input.get(CONF_LANGUAGE_PRIORITY, "")
+            if isinstance(raw_priority, str):
+                parsed = [p.strip() for p in raw_priority.split(",") if p.strip()]
+                user_input[CONF_LANGUAGE_PRIORITY] = parsed or list(
+                    DEFAULT_LANGUAGE_PRIORITY
+                )
             return self.async_create_entry(title="", data=user_input)
 
         options = self.config_entry.options
@@ -148,10 +174,30 @@ class EANReaderOptionsFlowHandler(config_entries.OptionsFlow):
                     ): bool,
                     vol.Optional(
                         CONF_LANGUAGE_PRIORITY,
-                        default=",".join(
+                        default=_lang_priority_to_str(
                             options.get(CONF_LANGUAGE_PRIORITY, DEFAULT_LANGUAGE_PRIORITY)
                         ),
                     ): str,
+                    vol.Optional(
+                        CONF_ENABLE_OFF_SUBMISSION,
+                        default=options.get(
+                            CONF_ENABLE_OFF_SUBMISSION, DEFAULT_ENABLE_OFF_SUBMISSION
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_OFF_USERNAME,
+                        default=options.get(CONF_OFF_USERNAME, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_OFF_PASSWORD,
+                        default=options.get(CONF_OFF_PASSWORD, ""),
+                    ): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
+                    vol.Optional(
+                        CONF_OFF_TEST_MODE,
+                        default=options.get(CONF_OFF_TEST_MODE, DEFAULT_OFF_TEST_MODE),
+                    ): bool,
                 }
             ),
         )

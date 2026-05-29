@@ -31,7 +31,11 @@
           "track_prices": "Enable price tracking",
           "track_expiry": "Enable expiry tracking",
           "enable_webhook": "Enable webhook",
-          "language_priority": "Language priority (comma-separated)"
+          "language_priority": "Language priority (comma-separated)",
+          "enable_off_submission": "Enable submitting products to OpenFoodFacts",
+          "off_username": "OpenFoodFacts username",
+          "off_password": "OpenFoodFacts password",
+          "off_test_mode": "Use OpenFoodFacts test/staging server (no real changes)"
         }
       }
     }

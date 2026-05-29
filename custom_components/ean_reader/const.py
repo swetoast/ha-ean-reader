@@ -20,6 +20,7 @@ EVENT_MAPPING_ADDED: Final = "ean_reader_mapping_added"
 EVENT_MAPPING_REMOVED: Final = "ean_reader_mapping_removed"
 EVENT_PRODUCT_SCANNED: Final = "ean_reader_product_scanned"
 EVENT_STATS_UPDATED: Final = "ean_reader_stats_updated"
+EVENT_OFF_SUBMITTED: Final = "ean_reader_off_submitted"
 
 # Configuration
 CONF_CONTACT_EMAIL: Final = "contact_email"
@@ -31,6 +32,12 @@ CONF_TRACK_EXPIRY: Final = "track_expiry"
 CONF_ENABLE_WEBHOOK: Final = "enable_webhook"
 CONF_SHOW_IMAGES: Final = "show_images"
 
+# OpenFoodFacts contribution (optional)
+CONF_ENABLE_OFF_SUBMISSION: Final = "enable_off_submission"
+CONF_OFF_USERNAME: Final = "off_username"
+CONF_OFF_PASSWORD: Final = "off_password"
+CONF_OFF_TEST_MODE: Final = "off_test_mode"
+
 # Defaults
 DEFAULT_LANGUAGE_PRIORITY: Final = ["sv", "en", "de", "fr", "es"]
 DEFAULT_AUTO_ADD: Final = True
@@ -39,6 +46,8 @@ DEFAULT_TRACK_PRICES: Final = False
 DEFAULT_TRACK_EXPIRY: Final = False
 DEFAULT_ENABLE_WEBHOOK: Final = False
 DEFAULT_SHOW_IMAGES: Final = True
+DEFAULT_ENABLE_OFF_SUBMISSION: Final = False
+DEFAULT_OFF_TEST_MODE: Final = False
 
 # Sensor attributes
 ATTR_TOTAL_MAPPINGS: Final = "total_mappings"

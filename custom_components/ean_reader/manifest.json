@@ -1,7 +1,7 @@
 {
   "domain": "ean_reader",
   "name": "EAN Reader",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "documentation": "https://github.com/swetoast/ha-ean-reader",
   "issue_tracker": "https://github.com/swetoast/ha-ean-reader/issues",
   "requirements": ["openfoodfacts>=0.2.0"],
